@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zabbix Dashboard</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Zabbix Dashboard</h1>
+        <div class="nav-links">
+            <a href="/">Chat</a>
+            <a href="/dashboard" class="active">Dashboard</a>
+            <a href="/docs">API</a>
+        </div>
+    </div>
+
+    <div class="dashboard-container">
+        <button class="refresh-button" onclick="refreshData()">
+            <span id="refresh-icon">🔄</span> Actualizar Datos
+        </button>
+
+        <div class="chart-container">
+            <h3 class="chart-title">Estado del Sistema</h3>
+            <div id="health-data">
+                <div class="chart-placeholder">
+                    <div class="spinner"></div>
+                    Cargando estado del sistema...
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid" id="stats-grid">
+            <div class="chart-placeholder">
+                <div class="spinner"></div>
+                Cargando estadísticas...
+            </div>
+        </div>
+    </div>
+
+    <script src="/script.js"></script>
+    <script>
+        // Código específico para el dashboard
+        // API_BASE ya está definido en script.js
+
+        // Cargar datos al iniciar
+        document.addEventListener('DOMContentLoaded', loadData);
+
+        async function loadData() {
+            await Promise.all([
+                loadHealthData(),
+                loadStatsData()
+            ]);
+        }
+
+        async function loadHealthData() {
+            try {
+                                const response = await fetch(`${API_BASE}/zabbix/status`);
+                const data = await response.json();
+                
+                const healthContainer = document.getElementById('health-data');
+                healthContainer.innerHTML = `
+                    <div class="health-item">
+                        <span>Estado General</span>
+                        <span class="status-indicator ${getStatusClass(data.status)}">${data.status.toUpperCase()}</span>
+                    </div>
+                    <div class="health-item">
+                        <span>Base de Datos</span>
+                        <span class="status-indicator ${getStatusClass(data.database)}">${data.database.toUpperCase()}</span>
+                    </div>
+                    <div class="health-item">
+                        <span>Gemini AI</span>
+                        <span class="status-indicator ${getStatusClass(data.gemini)}">${data.gemini.toUpperCase()}</span>
+                    </div>
+                    <div class="health-item">
+                        <span>Cache</span>
+                        <span class="status-indicator status-ok">${data.cache_size} elementos</span>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('health-data').innerHTML = `
+                    <div class="health-item">
+                        <span>Error cargando datos</span>
+                        <span class="status-indicator status-error">ERROR</span>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadStatsData() {
+            try {
+                const response = await fetch(`${API_BASE}/zabbix/status`);
+                const data = await response.json();
+                
+                const statsContainer = document.getElementById('stats-grid');
+                statsContainer.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Hosts Totales</span>
+                            <span class="stat-icon">🖥️</span>
+                        </div>
+                        <div class="stat-value">${data.total_hosts}</div>
+                        <div class="stat-change neutral">Hosts configurados</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Problemas Activos</span>
+                            <span class="stat-icon">⚠️</span>
+                        </div>
+                        <div class="stat-value" style="color: ${data.active_problems > 0 ? '#f44336' : '#4CAF50'}">${data.active_problems}</div>
+                        <div class="stat-change ${data.active_problems > 0 ? 'negative' : 'positive'}">Requieren atención</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Alertas Recientes</span>
+                            <span class="stat-icon">🔔</span>
+                        </div>
+                        <div class="stat-value">${data.recent_alerts}</div>
+                        <div class="stat-change neutral">Última hora</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Items de Monitoreo</span>
+                            <span class="stat-icon">📊</span>
+                        </div>
+                        <div class="stat-value">${data.total_items || 'N/A'}</div>
+                        <div class="stat-change neutral">Métricas activas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Triggers</span>
+                            <span class="stat-icon">⚡</span>
+                        </div>
+                        <div class="stat-value">${data.total_triggers || 'N/A'}</div>
+                        <div class="stat-change neutral">Condiciones configuradas</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Última Actualización</span>
+                            <span class="stat-icon">🕒</span>
+                        </div>
+                        <div class="stat-value" style="font-size: 1.2rem;">${new Date(data.timestamp).toLocaleTimeString()}</div>
+                        <div class="stat-change neutral">${new Date(data.timestamp).toLocaleDateString()}</div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('stats-grid').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-title">Error</span>
+                            <span class="stat-icon">❌</span>
+                        </div>
+                        <div class="stat-value" style="color: #f44336;">--</div>
+                        <div class="stat-change negative">No se pudieron cargar las estadísticas</div>
+                    </div>
+                `;
+            }
+        }
+
+        function getStatusClass(status) {
+            switch(status.toLowerCase()) {
+                case 'ok':
+                case 'connected':
+                    return 'status-ok';
+                case 'degraded':
+                case 'warning':
+                    return 'status-warning';
+                default:
+                    return 'status-error';
+            }
+        }
+
+        async function refreshData() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            refreshIcon.innerHTML = '<div class="spinner" style="width: 16px; height: 16px; border-width: 2px; margin: 0;"></div>';
+            
+            await loadData();
+            
+            refreshIcon.innerHTML = '🔄';
+        }
+    </script>
+</body>
+</html>
